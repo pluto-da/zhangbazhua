@@ -521,6 +521,7 @@ func TestOfficialTextProtocolsDeliverInstructions(t *testing.T) {
 	}{
 		{name: "openai-chat", packageName: "openai-chat-completions.beeftv-plugin", providerID: "chat-completion", messagesField: "messages"},
 		{name: "deepseek", packageName: "deepseek-chat.beeftv-plugin", providerID: "deepseek-chat", messagesField: "messages"},
+		{name: "xiaomi-mimo", packageName: "xiaomi-mimo-chat.beeftv-plugin", providerID: "xiaomi-mimo-chat", messagesField: "messages"},
 		{name: "atlascloud", packageName: "atlascloud-chat.beeftv-plugin", providerID: "atlascloud-chat", messagesField: "messages"},
 		{name: "openai-responses", packageName: "openai-responses.beeftv-plugin", providerID: "openai-response", messagesField: "input", instructionField: "instructions"},
 		{name: "anthropic", packageName: "anthropic-messages.beeftv-plugin", providerID: "claude-api", messagesField: "messages", instructionField: "system"},

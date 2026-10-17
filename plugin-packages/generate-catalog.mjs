@@ -221,6 +221,7 @@ add({
 for (const [id, name, vendor, baseUrl] of [
   ["xai-grok-chat", "xAI Grok Chat", "xAI", "https://api.x.ai"],
   ["deepseek-chat", "DeepSeek Chat", "DeepSeek", "https://api.deepseek.com"],
+  ["xiaomi-mimo-chat", "小米 MiMo Chat", "Xiaomi MiMo", "https://api.xiaomimimo.com"],
   ["mistral-chat", "Mistral Chat", "Mistral AI", "https://api.mistral.ai"],
   ["kimi-chat", "Kimi OpenAI-Compatible", "Moonshot AI", "https://api.moonshot.cn"],
   ["zhipu-glm-chat", "智谱 GLM Chat", "Zhipu AI", "https://open.bigmodel.cn/api/paas"],
