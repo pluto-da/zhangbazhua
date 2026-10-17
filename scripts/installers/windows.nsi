@@ -6,7 +6,7 @@
 !include "FileFunc.nsh"
 ${StrStr}
 ${UnStrStr}
-Name "BeefTV"
+Name "章八爪"
 OutFile "${OUTPUT}"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
@@ -28,9 +28,9 @@ Var MoveError
 Var MoveAttempt
 Var OldMoved
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "BeefTV"
+VIAddVersionKey "ProductName" "章八爪"
 VIAddVersionKey "FileVersion" "${VERSION}"
-VIAddVersionKey "FileDescription" "BeefTV Setup"
+VIAddVersionKey "FileDescription" "章八爪 安装程序"
 VIAddVersionKey "LegalCopyright" "BeefTV"
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE DirectoryPageLeave
 !insertmacro MUI_PAGE_DIRECTORY
@@ -472,10 +472,12 @@ Section "BeefTV (required)" SEC_APP
   install_registered:
   SetOutPath "$INSTDIR"
   CreateDirectory "$SMPROGRAMS\BeefTV"
-  CreateShortcut "$SMPROGRAMS\BeefTV\BeefTV.lnk" "$INSTDIR\BeefTV.exe"
+  Delete "$DESKTOP\BeefTV.lnk"
+  Delete "$SMPROGRAMS\BeefTV\BeefTV.lnk"
+  CreateShortcut "$SMPROGRAMS\BeefTV\章八爪.lnk" "$INSTDIR\BeefTV.exe"
   CreateShortcut "$SMPROGRAMS\BeefTV\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\BeefTV.lnk" "$INSTDIR\BeefTV.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayName" "BeefTV"
+  CreateShortcut "$DESKTOP\章八爪.lnk" "$INSTDIR\BeefTV.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayName" "章八爪"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "UninstallString" '$\"$INSTDIR\Uninstall.exe$\"'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "QuietUninstallString" '$\"$INSTDIR\Uninstall.exe$\" /S'
@@ -512,8 +514,10 @@ Section "Uninstall"
   # or remove shortcuts for the current installation.
   ReadRegStr $RegisteredInstallDir HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV" "InstallLocation"
   ${If} $RegisteredInstallDir == $INSTDIR
+    Delete "$DESKTOP\章八爪.lnk"
     Delete "$DESKTOP\BeefTV.lnk"
     Delete "$SMPROGRAMS\BeefTV\BeefTV.lnk"
+    Delete "$SMPROGRAMS\BeefTV\章八爪.lnk"
     Delete "$SMPROGRAMS\BeefTV\Uninstall.lnk"
     RMDir "$SMPROGRAMS\BeefTV"
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\BeefTV"

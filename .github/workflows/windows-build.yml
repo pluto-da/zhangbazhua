@@ -57,6 +57,6 @@ jobs:
         if: always()
         with:
           name: BeefTV-custom-windows
-          path: dist/BeefTV-*
+          path: dist/ZhangBaZhua-*
           retention-days: 14
           if-no-files-found: warn

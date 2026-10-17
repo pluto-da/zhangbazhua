@@ -11,5 +11,10 @@
   "wailsjsdir": "frontend/wailsjs",
   "author": {
     "name": "BeefTV Contributors"
+  },
+  "info": {
+    "companyName": "长鱼茶汤茗",
+    "productName": "章八爪",
+    "comments": "章八爪 — based on BeefTV (MIT)"
   }
 }

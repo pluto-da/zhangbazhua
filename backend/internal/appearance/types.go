@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	DefaultBrandName = "BeefTV"
+	DefaultBrandName = "章八爪"
 	DefaultBrandSlug = "beeftv"
 	DefaultSkinID    = "classic"
 	DefaultLogoURL   = "/logo.svg"

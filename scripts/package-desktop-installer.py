@@ -13,7 +13,7 @@ SUFFIXES = {'darwin-arm64': '.dmg', 'darwin-amd64': '.dmg',
 
 
 def installer_name(version, platform):
-    return f'BeefTV-{version}-{platform}{SUFFIXES[platform]}'
+    return f'ZhangBaZhua-{version}-{platform}{SUFFIXES[platform]}'
 
 
 def package(version, platform, payload, output):
