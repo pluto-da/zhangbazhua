@@ -1,7 +1,7 @@
 // 章八爪模块 · 实时最低价 · 作者 长鱼茶汤茗
 // 实时 = 打开即拉取 + 页面可见时每 5 分钟自动刷新 + 分时价按此刻计算；涨跌对比本机每日快照。
 import { useQuery } from "@tanstack/react-query";
-import { Alert, AutoComplete, Button, Empty, Spin, Switch, Tag } from "antd";
+import { Alert, AutoComplete, Button, Collapse, Empty, Input, Spin, Switch, Tag, message } from "antd";
 import { ArrowDown, ArrowUp, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { create } from "zustand";
@@ -10,10 +10,11 @@ import { persist } from "zustand/middleware";
 import { PageHeader, WorkspacePage } from "@/components/layout/workspace-page";
 import { useConfigStore } from "@/stores/use-config-store";
 
-import { fetchLive, fetchPrices, type LiveModel, type LiveOffer } from "../api";
+import { addRelay, checkRelay, deleteRelay, fetchLive, fetchPrices, listRelays, type LiveModel, type LiveOffer } from "../api";
+import { RISK_TEXT, canonicalId, relayDetail, riskBadges, unitOf, unitPrice } from "../price-units";
 import { openExternal } from "../open-external";
 
-const DEFAULT_WATCH = ["deepseek-v4-flash", "qwen3-max", "glm-4.6", "kimi-k2", "claude-sonnet-4.5", "gpt-5", "gemini-2.5-pro"];
+const DEFAULT_WATCH = ["doubao-seedance-2-0", "wan3-0-video", "sora-2", "deepseek-v4-flash", "qwen3-max", "glm-4-6", "kimi-k2", "claude-sonnet-4-5", "gpt-5", "gemini-2-5-pro"];
 const REFRESH_MS = 5 * 60_000;
 
 type WatchStore = {
@@ -35,9 +36,7 @@ const useWatch = create<WatchStore>()(
     ),
 );
 
-function simpleCanonical(id: string) {
-    return id.trim().toLowerCase().split("/").pop() || "";
-}
+const simpleCanonical = canonicalId;
 
 function siteOf(url: string) {
     try {
@@ -50,6 +49,11 @@ function siteOf(url: string) {
 
 function blend(i: number, o: number) {
     return (3 * i + o) / 4;
+}
+
+function unitSuffix(o: LiveOffer) {
+    const u = unitOf(o);
+    return u === "second" ? "/ 秒" : u === "image" ? "/ 张" : u === "call" ? "/ 次" : "/ 百万 tokens 综合";
 }
 
 function yuan(usd: number, rate: number) {
@@ -96,9 +100,9 @@ function ModelCard({ m, rate, now, mySites, onRemove }: { m: LiveModel; rate: nu
         const used = m.offers.find((o) => mySites.has(siteOf(o.url)));
         if (used === best || (used && used.provider === best.provider)) mine = <p className="text-xs text-emerald-500">你用的已经是最低价</p>;
         else if (used) {
-            const u = blend(used.inputUsd, used.outputUsd);
-            const b = blend(best.inputUsd, best.outputUsd);
-            mine = <p className="text-xs text-red-500">你在用的渠道比最低贵 {Math.round((u / b - 1) * 100)}%，换到 {best.providerName || best.provider} 每百万 tokens 省 {yuan(u - b, rate)}</p>;
+            const u = unitPrice(used);
+            const b = unitPrice(best);
+            mine = <p className="text-xs text-red-500">你在用的渠道比最低贵 {Math.round((u / b - 1) * 100)}%，换到 {best.providerName || best.provider} 每单位省 {yuan(u - b, rate)}</p>;
         } else mine = <p className="text-xs text-foreground/45">你配置的渠道不在最便宜的前 5 名里</p>;
     }
     return (
@@ -111,11 +115,17 @@ function ModelCard({ m, rate, now, mySites, onRemove }: { m: LiveModel; rate: nu
             {best ? (
                 <>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-semibold">{yuan(blend(best.inputUsd, best.outputUsd), rate)}</span>
-                        <span className="text-xs text-foreground/50">/ 百万 tokens 综合</span>
+                        <span className="text-2xl font-semibold">{yuan(unitPrice(best), rate)}</span>
+                        <span className="text-xs text-foreground/50">{unitSuffix(best)}</span>
                     </div>
-                    <p className="text-xs text-foreground/60">输入 {yuan(best.inputUsd, rate)} · 输出 {yuan(best.outputUsd, rate)}</p>
-                    <p className="text-sm">{best.providerName || best.provider} <Tag className="ml-1" color={best.tier === "官方/云厂商" ? "green" : undefined}>{best.tier}</Tag>{best.china ? <Tag>国内</Tag> : null}</p>
+                    {unitOf(best) === "token" ? (
+                        <p className="text-xs text-foreground/60">输入 {yuan(best.inputUsd, rate)} · 输出 {yuan(best.outputUsd, rate)}</p>
+                    ) : unitOf(best) === "second" ? (
+                        <p className="text-xs text-foreground/60">5 秒一条约 {yuan(unitPrice(best) * 5, rate)} · 10 秒约 {yuan(unitPrice(best) * 10, rate)}</p>
+                    ) : null}
+                    <p className="text-sm">{best.providerName || best.provider} <Tag className="ml-1" color={best.tier === "官方/云厂商" ? "green" : best.tier === "中转站" ? "purple" : undefined}>{best.tier}</Tag>{best.china ? <Tag>国内</Tag> : null}{riskBadges(best, officialMin).map((b) => <Tag key={b.text} color={b.color}>{b.text}</Tag>)}</p>
+                    {relayDetail(best) ? <p className="text-xs text-foreground/50">{relayDetail(best)}</p> : null}
+                    {officialMin && best.tier !== "官方/云厂商" ? <p className="text-xs text-foreground/50">官方最低 {yuan(officialMin, rate)}{unitSuffix(best)}</p> : null}
                     {m.changePct == null ? (
                         <p className="text-xs text-foreground/45">首日，明天起显示涨跌</p>
                     ) : m.changePct === 0 ? (
@@ -128,14 +138,81 @@ function ModelCard({ m, rate, now, mySites, onRemove }: { m: LiveModel; rate: nu
                     <TimedLine offer={best} rate={rate} now={now} />
                     {mine}
                     {m.offers.length > 1 ? (
-                        <p className="text-xs leading-5 text-foreground/45">其次：{m.offers.slice(1, 3).map((o) => `${o.providerName || o.provider} ${yuan(blend(o.inputUsd, o.outputUsd), rate)}`).join("，")} · 共 {m.offerCount} 家</p>
+                        <p className="text-xs leading-5 text-foreground/45">其次：{m.offers.slice(1, 3).map((o) => `${o.providerName || o.provider} ${yuan(unitPrice(o), rate)}${unitOf(o) === unitOf(best) ? "" : unitSuffix(o)}`).join("，")} · 共 {m.offerCount} 家</p>
                     ) : null}
-                    <div><Button size="small" type="link" className="!px-0" onClick={() => openExternal(best.url)}>价格页</Button></div>
+                    <div><Button size="small" type="link" className="!px-0" onClick={() => openExternal(best.url)}>{best.tier === "中转站" ? "官网" : "价格页"}</Button></div>
                 </>
             ) : (
                 <p className="text-sm text-foreground/50">暂无可比价格（可能拼写不同，换个名字搜搜）</p>
             )}
         </section>
+    );
+}
+
+function MyRelaysPanel({ onChanged }: { onChanged: () => void }) {
+    const relays = useQuery({ queryKey: ["zbz-relays"], queryFn: listRelays });
+    const [base, setBase] = useState("");
+    const [name, setName] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [checked, setChecked] = useState<string>("");
+    const doCheck = async () => {
+        setBusy(true);
+        setChecked("");
+        try {
+            const r = await checkRelay(base);
+            setChecked(`${r.name || r.base}：可比价，${r.offers} 条报价，充值价 ${r.rechargePrice || "未公开"} 元 = 1 美元额度`);
+            if (!name) setName(r.name || "");
+        } catch (e) {
+            setChecked(`不能添加：${e instanceof Error ? e.message : String(e)}`);
+        } finally {
+            setBusy(false);
+        }
+    };
+    const doAdd = async () => {
+        setBusy(true);
+        try {
+            await addRelay(name, base);
+            setBase("");
+            setName("");
+            setChecked("");
+            await relays.refetch();
+            onChanged();
+            void message.success("已添加，正在拉取它的价格");
+        } catch (e) {
+            void message.error(e instanceof Error ? e.message : String(e));
+        } finally {
+            setBusy(false);
+        }
+    };
+    return (
+        <Collapse
+            className="mt-4"
+            items={[
+                {
+                    key: "relays",
+                    label: `我的中转站（${relays.data?.length || 0}）· 添加任何 New API / One API 站点参与比价`,
+                    children: (
+                        <div className="flex flex-col gap-3">
+                            <p className="text-xs leading-5 text-foreground/55">只需站点地址，不要密钥、不用登录。价格 = 额度价 × 分组倍率 × 充值价，已换算成实付人民币。{RISK_TEXT}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Input className="w-72 max-w-full" placeholder="站点地址，如 https://api.example.com" value={base} onChange={(e) => setBase(e.target.value)} />
+                                <Input className="w-44" placeholder="名称（可不填）" value={name} onChange={(e) => setName(e.target.value)} />
+                                <Button loading={busy} disabled={!base.trim()} onClick={() => void doCheck()}>检查</Button>
+                                <Button type="primary" loading={busy} disabled={!base.trim()} onClick={() => void doAdd()}>添加</Button>
+                            </div>
+                            {checked ? <p className="text-xs">{checked}</p> : null}
+                            <div className="flex flex-wrap gap-2">
+                                {(relays.data || []).map((r) => (
+                                    <Tag key={r.id} closable onClose={(e) => { e.preventDefault(); void deleteRelay(r.id).then(() => { void relays.refetch(); onChanged(); }); }}>
+                                        {r.name} · {r.base.replace("https://", "")}
+                                    </Tag>
+                                ))}
+                            </div>
+                        </div>
+                    ),
+                },
+            ]}
+        />
     );
 }
 
@@ -175,7 +252,8 @@ export default function LivePricesPage() {
     const options = useMemo(() => {
         const needle = input.trim().toLowerCase();
         if (!needle || !catalog.data) return [];
-        return catalog.data.prices.models.filter((m) => m.id.includes(needle)).slice(0, 12).map((m) => ({ value: m.id, label: `${m.id}（${m.offers.length} 家）` }));
+        const cn = canonicalId(needle);
+        return catalog.data.prices.models.filter((m) => m.id.includes(cn) || m.id.includes(needle)).slice(0, 12).map((m) => ({ value: m.id, label: `${m.id}（${m.offers.length} 家）` }));
     }, [input, catalog.data]);
 
     const add = (id: string) => {
@@ -184,7 +262,7 @@ export default function LivePricesPage() {
         setList([...watch, v].slice(0, 40));
         setInput("");
     };
-    const remove = (id: string) => setList(watch.filter((w) => w !== id));
+    const remove = (id: string) => setList(watch.filter((w) => canonicalId(w) !== id));
     const data = live.data;
     const rate = data?.usdCny || 7.1;
 
@@ -192,7 +270,7 @@ export default function LivePricesPage() {
         <WorkspacePage>
             <PageHeader
                 title="实时最低价"
-                description="你盯的模型此刻在哪里调用最便宜。打开即拉取最新价格，分时段计价按此刻算，页面开着时每 5 分钟自动刷新；价格以官方页面为准。"
+                description="你盯的模型（含视频模型）此刻在哪里最便宜：官方、云厂商、聚合平台、中转站一起比，按实付人民币算。打开即拉取，分时段计价按此刻算，页面开着时每 5 分钟自动刷新。"
                 actions={
                     <div className="flex flex-wrap items-center gap-3">
                         <span className="flex items-center gap-2 text-sm"><Switch size="small" checked={officialOnly} onChange={setOfficialOnly} />只看官方/云厂商</span>
@@ -209,6 +287,7 @@ export default function LivePricesPage() {
                 <Button icon={<RotateCcw className="size-3.5" />} onClick={() => setList(null)}>恢复默认</Button>
                 <span className="text-xs text-foreground/45">已关注 {watch.length} 个，最多 40 个</span>
             </div>
+            <MyRelaysPanel onChanged={() => void live.refetch()} />
             {watch.length === 0 ? (
                 <Empty className="mt-10" description="还没有关注的模型。搜一个加进来，或点“恢复默认”。" />
             ) : live.isLoading ? (
@@ -219,7 +298,7 @@ export default function LivePricesPage() {
                 </div>
             )}
             <p className="mt-4 text-xs leading-5 text-foreground/45">
-                数据来源：{(data?.sources || []).map((s) => `${s.name}${s.ok ? "" : "（失败）"}`).join("、") || "—"}；美元汇率 {rate}。综合价按输入:输出 = 3:1 计算；涨跌按各平台常规价最低值与本机昨日快照比较。零价未确认、异常价与第三方中转站不参与。
+                数据来源：{(data?.sources || []).map((s) => `${s.name}${s.ok ? "" : "（失败）"}`).join("、") || "—"}；美元汇率 {rate}。文本综合价按输入:输出 = 3:1 计算，视频按每秒；涨跌按常规价最低值与本机昨日快照比较。零价未确认与偏离中位数 100 倍的异常价不参与。
             </p>
         </WorkspacePage>
     );

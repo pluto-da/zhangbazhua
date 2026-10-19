@@ -1,6 +1,7 @@
 package zbz
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func dsOffer(t *testing.T) liveOffer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	list := m["deepseek-v4.1-flash"]
+	list := m["deepseek-v4-1-flash"]
 	if len(list) != 1 || !list[0].Timed || len(list[0].rules) != 6 {
 		t.Fatalf("解析分时规则失败: %+v", list)
 	}
@@ -63,7 +64,7 @@ func TestNextChange(t *testing.T) {
 
 func TestTokenTierIgnoredAndZeroDropped(t *testing.T) {
 	m, _ := parseOpenRouter([]byte(dsOverrides))
-	for _, r := range m["deepseek-v4.1-flash"][0].rules {
+	for _, r := range m["deepseek-v4-1-flash"][0].rules {
 		if r.TokenTier {
 			t.Fatal("min_prompt_tokens 规则不应进入时段规则")
 		}
@@ -76,7 +77,7 @@ func TestTokenTierIgnoredAndZeroDropped(t *testing.T) {
 
 func TestParseWanted(t *testing.T) {
 	got := parseWanted("DeepSeek/DeepSeek-V4.1-Flash-1017, <script>, qwen3-max,,qwen3-max")
-	if len(got) != 2 || got[0] != "deepseek-v4.1-flash" || got[1] != "qwen3-max" {
+	if len(got) != 2 || got[0] != "deepseek-v4-1-flash" || got[1] != "qwen3-max" {
 		t.Fatalf("got %v", got)
 	}
 }
@@ -90,5 +91,45 @@ func TestHistory(t *testing.T) {
 	l.applyHistory(ms, now)
 	if ms[0].YesterdayBlendUsd == nil || *ms[0].YesterdayBlendUsd != 1 || *ms[0].ChangePct != -10 || !ms[0].IsNewLow {
 		t.Fatalf("history got %+v", ms[0])
+	}
+}
+
+func TestNewAPIOffers(t *testing.T) {
+	st := newAPIStatus{}
+	st.Data.Price = 0.5
+	var pr newAPIPricing
+	_ = json.Unmarshal([]byte(`{"group_ratio":{"default":1,"官转":1.5,"纯AZ":2},"data":[
+	{"model_name":"glm-4.6","quota_type":0,"model_ratio":1.25,"completion_ratio":8,"enable_groups":["default"]},
+	{"model_name":"doubao-seedance-1-5-pro-251215","quota_type":1,"model_price":16,"enable_groups":["官转","纯AZ"]},
+	{"model_name":"kling-v2-5s","quota_type":1,"model_price":2,"enable_groups":["default"]}]}`), &pr)
+	got, err := newAPIOffers(relaySite{ID: "t", Name: "测试", Base: "https://x.cn"}, st, pr, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := got["glm-4-6"][0]
+	if !near(g.CnyReal, 1.25) || !near(g.BaseOutputUsd*7, 10) {
+		t.Fatalf("token 价错误 %+v", g)
+	}
+	s := got["doubao-seedance-1-5-pro"][0]
+	if s.Unit != "call" || !near(s.CnyReal, 12) || s.Group != "官转" {
+		t.Fatalf("按次价/分组错误 %+v", s)
+	}
+	k := got["kling-v2-5s"][0]
+	if k.Unit != "second" || k.AssumedSecs != 5 || !near(k.CnyReal, 0.2) {
+		t.Fatalf("时长换算错误 %+v", k)
+	}
+}
+
+func TestNormalizeBase(t *testing.T) {
+	for _, bad := range []string{"http://example.com", "https://127.0.0.1", "https://10.0.0.1", "file:///etc/passwd", "https://localhost"} {
+		if _, err := normalizeBase(bad); err == nil {
+			t.Errorf("%s 应被拒绝", bad)
+		}
+	}
+}
+
+func TestCanonicalDots(t *testing.T) {
+	if canonical("anthropic/claude-sonnet-4.5") != canonical("claude-sonnet-4-5-20250929") {
+		t.Fatal("点与横线未合并")
 	}
 }

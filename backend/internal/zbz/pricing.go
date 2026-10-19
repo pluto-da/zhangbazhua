@@ -183,7 +183,8 @@ func blend(o offer) float64 { return (3*o.Input + o.Output) / 4 }
 
 var (
 	reSuffix  = regexp.MustCompile(`:(free|beta|extended|thinking|nitro|floor)$`)
-	reDate    = regexp.MustCompile(`[-_@](20\d{2}-?\d{2}-?\d{2}|\d{4})$`)
+	reDate    = regexp.MustCompile(`[-_@](20\d{2}-?\d{2}-?\d{2}|\d{6}|\d{4})$`)
+	reDotNum  = regexp.MustCompile(`(\d)\.(\d)`)
 	reRegion  = regexp.MustCompile(`^(us|eu|apac|global)\.`)
 	reVendor  = regexp.MustCompile(`^(anthropic|meta|amazon|mistral|cohere|ai21)\.`)
 	reVersion = regexp.MustCompile(`-v\d+:\d+$`)
@@ -200,5 +201,8 @@ func canonical(id string) string {
 	s = reRegion.ReplaceAllString(s, "")
 	s = reVendor.ReplaceAllString(s, "")
 	s = reVersion.ReplaceAllString(s, "")
+	// 4.5 → 4-5，与官方命名对齐（重复一次处理 1.2.3 这类连续情况）
+	s = reDotNum.ReplaceAllString(s, "$1-$2")
+	s = reDotNum.ReplaceAllString(s, "$1-$2")
 	return s
 }

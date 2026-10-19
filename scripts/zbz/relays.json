@@ -1,0 +1,23 @@
+{
+  "note": "章八爪内置中转站名单 · 2026-10-19 实测 GET /api/pricing 免登录公开。type=newapi 表示 New API / One API 系统。价格 = 额度价 × 分组倍率 × 充值价（/api/status 的 price，元/每 1 美元额度）。",
+  "relays": [
+    {"id": "yunwu", "name": "云雾 API", "base": "https://yunwu.ai", "type": "newapi"},
+    {"id": "bltcy", "name": "柏拉图 AI", "base": "https://api.bltcy.ai", "type": "newapi"},
+    {"id": "kksj", "name": "KKSJ", "base": "https://api.kksj.org", "type": "newapi"},
+    {"id": "xty", "name": "AiCore", "base": "https://api.xty.app", "type": "newapi"},
+    {"id": "holdai", "name": "HoldAI", "base": "https://api.holdai.top", "type": "newapi"},
+    {"id": "zyai", "name": "ZYAI", "base": "https://api.zyai.online", "type": "newapi"},
+    {"id": "xi-ai", "name": "XI-AI", "base": "https://api.xi-ai.cn", "type": "newapi"},
+    {"id": "openai-next", "name": "OpenAI-Next", "base": "https://api.openai-next.com", "type": "newapi"},
+    {"id": "huiyan", "name": "慧眼 AI", "base": "https://api.huiyan-ai.cn", "type": "newapi"},
+    {"id": "gaochao", "name": "高超 AI", "base": "https://api.ai-gaochao.cn", "type": "newapi"},
+    {"id": "n1n", "name": "N1N", "base": "https://api.n1n.ai", "type": "newapi"},
+    {"id": "gemai", "name": "GemAI", "base": "https://api.gemai.cc", "type": "newapi"},
+    {"id": "apiyi", "name": "API 易", "base": "https://api.apiyi.com", "type": "newapi"},
+    {"id": "laozhang", "name": "老张 API", "base": "https://api.laozhang.ai", "type": "newapi"},
+    {"id": "qingyun", "name": "青云 API（云雾镜像）", "base": "https://api.qingyuntop.top", "type": "newapi", "mirrorOf": "yunwu"},
+    {"id": "chatgptid", "name": "ChatGPTID", "base": "https://api.chatgptid.net", "type": "newapi"},
+    {"id": "ikuncode", "name": "iKunCode", "base": "https://api.ikuncode.cc", "type": "newapi"},
+    {"id": "beeftv", "name": "BeefTV 官方算力（作者站）", "base": "https://beeftv.app", "type": "newapi", "pricingPublic": false}
+  ]
+}

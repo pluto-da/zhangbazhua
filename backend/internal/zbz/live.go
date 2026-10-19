@@ -110,6 +110,18 @@ type liveOffer struct {
 	OutputUsd     float64  `json:"outputUsd"`
 	BaseInputUsd  float64  `json:"baseInputUsd"`
 	BaseOutputUsd float64  `json:"baseOutputUsd"`
+	Unit          string   `json:"unit"`
+	UnitUsd       float64  `json:"unitUsd,omitempty"`
+	Res           string   `json:"res,omitempty"`
+	AssumedSecs   int      `json:"assumedSeconds,omitempty"`
+	CnyReal       float64  `json:"cnyReal,omitempty"`
+	Group         string   `json:"group,omitempty"`
+	GroupRatio    float64  `json:"groupRatio,omitempty"`
+	MinGroup      string   `json:"minGroup,omitempty"`
+	MinGroupRatio float64  `json:"minGroupRatio,omitempty"`
+	RechargePrice float64  `json:"rechargePrice,omitempty"`
+	RechargeGuess bool     `json:"rechargeAssumed,omitempty"`
+	Site          string   `json:"site,omitempty"`
 	Timed         bool     `json:"timed"`
 	NextChangeAt  string   `json:"nextChangeAt,omitempty"`
 	NextBlendUsd  *float64 `json:"nextBlendUsd,omitempty"`
@@ -122,6 +134,8 @@ type liveModel struct {
 	Offers            []liveOffer `json:"offers"`
 	OfferCount        int         `json:"offerCount"`
 	BaseBestBlendUsd  float64     `json:"baseBestBlendUsd"`
+	Unit              string      `json:"unit"`
+	Modalities        []string    `json:"modalities"`
 	YesterdayBlendUsd *float64    `json:"yesterdayBlendUsd"`
 	ChangePct         *float64    `json:"changePct"`
 	IsNewLow          bool        `json:"isNewLow"`
@@ -141,15 +155,17 @@ type cachedSource struct {
 }
 
 type live struct {
-	mu      sync.Mutex
-	pricing *pricing
-	or      cachedSource
-	md      cachedSource
-	hist    string
+	mu         sync.Mutex
+	pricing    *pricing
+	or         cachedSource
+	md         cachedSource
+	hist       string
+	relays     *myRelays
+	modalities map[string][]string
 }
 
 func newLive(dir string, p *pricing) *live {
-	return &live{pricing: p, hist: filepath.Join(dir, "price-history.json")}
+	return &live{pricing: p, hist: filepath.Join(dir, "price-history.json"), relays: newMyRelays(dir), modalities: map[string][]string{}}
 }
 
 func (l *live) refresh(src *cachedSource, ttl time.Duration, fetch func() (map[string][]liveOffer, error)) {
@@ -206,7 +222,7 @@ func parseOpenRouter(b []byte) (map[string][]liveOffer, error) {
 		if !ok1 || !ok2 || in < 0 || outp < 0 {
 			continue
 		}
-		o := liveOffer{Provider: "openrouter", ProviderName: "OpenRouter", Tier: tierOf("openrouter"), Source: "OpenRouter 实时", URL: "https://openrouter.ai/" + m.ID, RawModel: m.ID, BaseInputUsd: in, BaseOutputUsd: outp}
+		o := liveOffer{Provider: "openrouter", ProviderName: "OpenRouter", Tier: tierOf("openrouter"), Source: "OpenRouter 实时", URL: "https://openrouter.ai/" + m.ID, RawModel: m.ID, BaseInputUsd: in, BaseOutputUsd: outp, Unit: "token"}
 		if list, ok := m.Pricing["overrides"].([]any); ok {
 			for _, item := range list {
 				r, ok := item.(map[string]any)
@@ -278,7 +294,7 @@ func parseModelsDevLive(b []byte) (map[string][]liveOffer, error) {
 			if url == "" {
 				url = "https://models.dev"
 			}
-			o := liveOffer{Provider: strings.ToLower(pid), ProviderName: prov.Name, Tier: tierOf(pid), Source: "models.dev 实时", URL: url, RawModel: mid, China: chinaRe.MatchString(pid) || strings.Contains(prov.API, ".cn"), BaseInputUsd: m.Cost.Input, BaseOutputUsd: m.Cost.Output}
+			o := liveOffer{Provider: strings.ToLower(pid), ProviderName: prov.Name, Tier: tierOf(pid), Source: "models.dev 实时", URL: url, RawModel: mid, China: chinaRe.MatchString(pid) || strings.Contains(prov.API, ".cn"), BaseInputUsd: m.Cost.Input, BaseOutputUsd: m.Cost.Output, Unit: "token"}
 			key := canonical(mid)
 			if _, ok := firstByProvider(out[key], o.Provider); ok {
 				continue
@@ -291,7 +307,7 @@ func parseModelsDevLive(b []byte) (map[string][]liveOffer, error) {
 
 func firstByProvider(list []liveOffer, provider string) (liveOffer, bool) {
 	for _, o := range list {
-		if o.Provider == provider {
+		if o.Provider == provider && (o.Unit == "" || o.Unit == "token") {
 			return o, true
 		}
 	}
@@ -300,7 +316,7 @@ func firstByProvider(list []liveOffer, provider string) (liveOffer, bool) {
 
 func replaceProvider(list []liveOffer, o liveOffer) []liveOffer {
 	for i := range list {
-		if list[i].Provider == o.Provider {
+		if list[i].Provider == o.Provider && unitOf(list[i]) == unitOf(o) {
 			list[i] = o
 			return list
 		}
@@ -319,15 +335,13 @@ func (l *live) baseline(wanted map[string]bool) (map[string][]liveOffer, float64
 	var f struct {
 		UsdCny float64 `json:"usdCny"`
 		Models []struct {
-			ID     string `json:"id"`
-			Offers []struct {
-				Provider     string  `json:"provider"`
-				ProviderName string  `json:"providerName"`
-				Source       string  `json:"source"`
-				URL          string  `json:"url"`
-				China        bool    `json:"china"`
-				InputUsd     float64 `json:"inputUsd"`
-				OutputUsd    float64 `json:"outputUsd"`
+			ID         string   `json:"id"`
+			Modalities []string `json:"modalities"`
+			Offers     []struct {
+				liveOffer
+				InputUsd  float64 `json:"inputUsd"`
+				OutputUsd float64 `json:"outputUsd"`
+				RawModel  string  `json:"rawModel"`
 			} `json:"offers"`
 		} `json:"models"`
 	}
@@ -336,11 +350,23 @@ func (l *live) baseline(wanted map[string]bool) (map[string][]liveOffer, float64
 	}
 	out := map[string][]liveOffer{}
 	for _, m := range f.Models {
-		if !wanted[m.ID] {
+		id := canonical(m.ID)
+		if !wanted[id] {
 			continue
 		}
+		l.modalities[id] = m.Modalities
 		for _, o := range m.Offers {
-			out[m.ID] = append(out[m.ID], liveOffer{Provider: strings.ToLower(o.Provider), ProviderName: o.ProviderName, Tier: tierOf(o.Provider), Source: o.Source + " 日报", URL: o.URL, China: o.China, BaseInputUsd: o.InputUsd, BaseOutputUsd: o.OutputUsd})
+			lo := o.liveOffer
+			lo.Provider = strings.ToLower(lo.Provider)
+			if lo.Tier == "" {
+				lo.Tier = tierOf(lo.Provider)
+			}
+			lo.Source += " 日报"
+			lo.BaseInputUsd, lo.BaseOutputUsd, lo.RawModel = o.InputUsd, o.OutputUsd, o.RawModel
+			if lo.Unit == "" {
+				lo.Unit = "token"
+			}
+			out[id] = append(out[id], lo)
 		}
 	}
 	return out, f.UsdCny, true
@@ -424,6 +450,7 @@ func (l *live) handle(c *gin.Context) {
 		}
 	}
 
+	myOffers, myStates := l.relays.offers(usdCny)
 	now := time.Now()
 	models := make([]liveModel, 0, len(wantedList))
 	for _, id := range wantedList {
@@ -434,7 +461,15 @@ func (l *live) handle(c *gin.Context) {
 		for _, o := range l.or.offers[id] {
 			merged = replaceProvider(merged, o)
 		}
-		models = append(models, buildModel(id, merged, now, officialOnly))
+		for _, o := range myOffers[id] {
+			merged = replaceProvider(merged, o)
+		}
+		lm := buildModel(id, merged, now, officialOnly)
+		lm.Modalities = l.modalities[id]
+		if lm.Modalities == nil {
+			lm.Modalities = []string{}
+		}
+		models = append(models, lm)
 	}
 	l.applyHistory(models, now)
 	daily := sourceState{Name: "日报 prices.json", OK: haveDaily}
@@ -447,62 +482,113 @@ func (l *live) handle(c *gin.Context) {
 		"generatedAt": now.UTC().Format(time.RFC3339),
 		"mode":        mode,
 		"usdCny":      usdCny,
-		"sources":     []sourceState{l.or.state("OpenRouter 实时"), l.md.state("models.dev 实时"), daily},
+		"sources":     append([]sourceState{l.or.state("OpenRouter 实时"), l.md.state("models.dev 实时"), daily}, myStates...),
 		"models":      models,
 	})
 }
 
+func unitOf(o liveOffer) string {
+	if o.Unit == "" {
+		return "token"
+	}
+	return o.Unit
+}
+
+// priceNow 是同一计费单位内可比较的此刻单价（token 为 3:1 综合价，其他为 unitUsd）。
+func priceNow(o liveOffer) float64 {
+	if unitOf(o) == "token" {
+		return blendUsd(o.InputUsd, o.OutputUsd)
+	}
+	return o.UnitUsd
+}
+
+func priceBase(o liveOffer) float64 {
+	if unitOf(o) == "token" {
+		return blendUsd(o.BaseInputUsd, o.BaseOutputUsd)
+	}
+	return o.UnitUsd
+}
+
+var unitRank = map[string]int{"second": 0, "token": 1, "image": 2, "call": 3}
+
 func buildModel(id string, offers []liveOffer, now time.Time, officialOnly bool) liveModel {
 	kept := make([]liveOffer, 0, len(offers))
 	for _, o := range offers {
-		if o.BaseInputUsd < 0 || o.BaseOutputUsd < 0 || (o.BaseInputUsd == 0 && o.BaseOutputUsd == 0) {
-			continue // 零价多为未标价或限时免费，未确认，不参与
+		u := unitOf(o)
+		if u == "token" {
+			if o.BaseInputUsd < 0 || o.BaseOutputUsd < 0 || (o.BaseInputUsd == 0 && o.BaseOutputUsd == 0) {
+				continue // 零价多为未标价或限时免费，未确认，不参与
+			}
+		} else if o.UnitUsd <= 0 {
+			continue
 		}
 		if officialOnly && o.Tier != "官方/云厂商" {
 			continue
 		}
+		o.Unit = u
 		o.InputUsd, o.OutputUsd = effectivePrice(o.BaseInputUsd, o.BaseOutputUsd, o.rules, now)
-		if at, b, okc := nextChange(o.BaseInputUsd, o.BaseOutputUsd, o.rules, now); okc {
-			o.NextChangeAt = at.UTC().Format(time.RFC3339)
-			bb := b
-			o.NextBlendUsd = &bb
+		if u == "token" {
+			if at, b, okc := nextChange(o.BaseInputUsd, o.BaseOutputUsd, o.rules, now); okc {
+				o.NextChangeAt = at.UTC().Format(time.RFC3339)
+				bb := b
+				o.NextBlendUsd = &bb
+			}
 		}
 		kept = append(kept, o)
 	}
-	// 偏离中位数 100 倍的异常价剔除
-	if len(kept) >= 3 {
-		bl := make([]float64, len(kept))
-		for i, o := range kept {
-			bl[i] = blendUsd(o.BaseInputUsd, o.BaseOutputUsd)
-		}
-		sorted := append([]float64(nil), bl...)
-		sort.Float64s(sorted)
-		med := sorted[len(sorted)/2]
-		filtered := kept[:0]
-		for i, o := range kept {
-			if med > 0 && (bl[i] > med*100 || bl[i] < med/100) {
-				continue
-			}
-			filtered = append(filtered, o)
-		}
-		kept = filtered
+	// 同一单位内，偏离中位数 100 倍的异常价剔除
+	byUnit := map[string][]float64{}
+	for _, o := range kept {
+		byUnit[o.Unit] = append(byUnit[o.Unit], priceBase(o))
 	}
-	sort.SliceStable(kept, func(i, j int) bool {
-		return blendUsd(kept[i].InputUsd, kept[i].OutputUsd) < blendUsd(kept[j].InputUsd, kept[j].OutputUsd)
-	})
-	m := liveModel{ID: id, OfferCount: len(kept), Offers: []liveOffer{}}
+	med := map[string]float64{}
+	for u, v := range byUnit {
+		if len(v) >= 3 {
+			sorted := append([]float64(nil), v...)
+			sort.Float64s(sorted)
+			med[u] = sorted[len(sorted)/2]
+		}
+	}
+	filtered := kept[:0]
+	for _, o := range kept {
+		if m := med[o.Unit]; m > 0 && (priceBase(o) > m*100 || priceBase(o) < m/100) {
+			continue
+		}
+		filtered = append(filtered, o)
+	}
+	kept = filtered
+	m := liveModel{ID: id, OfferCount: len(kept), Offers: []liveOffer{}, Modalities: []string{}}
 	if len(kept) == 0 {
 		return m
 	}
+	primary := ""
+	for _, o := range kept {
+		if primary == "" || unitRank[o.Unit] < unitRank[primary] {
+			primary = o.Unit
+		}
+	}
+	m.Unit = primary
+	sort.SliceStable(kept, func(i, j int) bool {
+		pi, pj := kept[i].Unit == primary, kept[j].Unit == primary
+		if pi != pj {
+			return pi
+		}
+		if kept[i].Unit != kept[j].Unit {
+			return unitRank[kept[i].Unit] < unitRank[kept[j].Unit]
+		}
+		return priceNow(kept[i]) < priceNow(kept[j])
+	})
 	best := kept[0]
 	m.Best = &best
 	baseMin := math.Inf(1)
 	for _, o := range kept {
-		baseMin = math.Min(baseMin, blendUsd(o.BaseInputUsd, o.BaseOutputUsd))
+		if o.Unit == primary {
+			baseMin = math.Min(baseMin, priceBase(o))
+		}
 	}
 	m.BaseBestBlendUsd = baseMin
-	if len(kept) > 5 {
-		kept = kept[:5]
+	if len(kept) > 6 {
+		kept = kept[:6]
 	}
 	m.Offers = kept
 	return m
