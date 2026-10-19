@@ -7,6 +7,7 @@ import { loadAgentsPage, loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, 
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
 import RouteErrorPage from "@/pages/route-error";
 import { isLocalWorkspaceMode } from "@/services/workspace-mode";
+import { zbzRoutes } from "@/zbz/routes";
 
 const AgentsPage = lazy(loadAgentsPage);
 const AssetsPage = lazy(loadAssetsPage);
@@ -96,6 +97,7 @@ export const router = createWorkspaceRouter([
             },
             { path: "/settings", element: deferred(<SettingsPage />) },
             { path: "/agents", element: deferred(<AgentsPage />) },
+            ...zbzRoutes, // 章八爪模块挂载点
             { path: "/test-voice-recording", element: deferred(<TestVoiceRecording />) },
             {
                 path: "/projects",

@@ -24,6 +24,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 章八爪品牌统一（构建时替换并审计）
+        shell: bash
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          python scripts/zbz/rebrand.py
+          python scripts/zbz/rebrand.py --check
       - name: Select bundled Node runtime
         shell: bash
         run: |

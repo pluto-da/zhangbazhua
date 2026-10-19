@@ -1,0 +1,44 @@
+# 章八爪模块 · 模型比价雷达数据管线 · 作者 长鱼茶汤茗
+# 每天北京时间 06:00 汇总价格，发布到 data 分支的 prices.json（软件经 jsDelivr 读取）。
+name: ZBZ price radar
+on:
+  schedule:
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: zbz-price-radar
+  cancel-in-progress: false
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/zbz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build prices.json
+        run: |
+          mkdir -p out
+          curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/data/prices.json" -o previous.json || true
+          if [ -s previous.json ]; then PREV="--previous previous.json"; else PREV=""; fi
+          python scripts/zbz/price_radar.py out/prices.json $PREV
+      - name: Publish to data branch
+        run: |
+          cd out
+          cat > README.md <<'MD'
+          # 章八爪 · 模型比价数据
+          每天自动生成，来源 models.dev、OpenRouter、LiteLLM。价格单位：美元 / 每百万 tokens；usdCny 为当日汇率。仅供比较，以官方为准。
+          MD
+          git init -q -b data
+          git config user.name "zbz-price-radar"
+          git config user.email "zbz-price-radar@users.noreply.github.com"
+          git add prices.json README.md
+          git commit -qm "prices $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" data
+          # 刷新 jsDelivr 缓存
+          curl -fsS "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@data/prices.json" || true

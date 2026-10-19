@@ -6,6 +6,7 @@ import (
 	"infinite-canvas/backend/internal/agentops"
 	"infinite-canvas/backend/internal/app"
 	"infinite-canvas/backend/internal/eagle"
+	"infinite-canvas/backend/internal/zbz"
 
 	"github.com/gin-gonic/gin"
 )
@@ -85,6 +86,7 @@ func registerDesktopCanvasAPI(api *gin.RouterGroup, svc *app.Service, dependenci
 	projectAPI := api.Group("")
 	projectAPI.Use(RequireFeature(svc, app.FeatureShortDrama))
 	RegisterProjectRoutes(projectAPI, svc)
+	zbz.Register(api, svc.DataDir()) // 章八爪模块挂载点（唯一一行）
 }
 
 func RegisterOpenAPIRoutes(api *gin.RouterGroup) {

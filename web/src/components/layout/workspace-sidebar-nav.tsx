@@ -16,6 +16,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { getDesktopAppBinding } from "@/services/desktop-runtime";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { OnboardingEntry } from "@/components/onboarding/first-creation-guide";
+import { useZbzModules, zbzNavGroup } from "@/zbz/modules";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -56,6 +57,7 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
                 { id: "agents", title: "BeefTV MCP", icon: Plug, to: "/agents" },
             ],
         },
+        zbzNavGroup(), // 章八爪模块挂载点
     ];
 
     // 管理、设置和退出登录不再占据参考站式侧栏底部，而是通过用户卡片菜单进入。
@@ -258,7 +260,8 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
     const { pathname } = useLocation();
     const [searchParams] = useSearchParams();
     const features = useUserStore((state) => state.features);
-    const { groups, footer } = useMemo(() => buildNav(features), [features]);
+    const zbzEnabled = useZbzModules((state) => state.enabled);
+    const { groups, footer } = useMemo(() => buildNav(features), [features, zbzEnabled]);
 
     const rawSlug = pathname.split("/").filter(Boolean)[0] || "home";
     // `/project` is the LibTV-compatible alias for the existing canvas library route.
