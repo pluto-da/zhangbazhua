@@ -95,6 +95,8 @@ function TimedLine({ offer, rate, now }: { offer: LiveOffer; rate: number; now: 
 
 function ModelCard({ m, rate, now, mySites, onRemove }: { m: LiveModel; rate: number; now: number; mySites: Set<string> | undefined; onRemove: () => void }) {
     const best = m.best;
+    const officials = best ? m.offers.filter((o) => o.tier === "官方/云厂商" && unitOf(o) === unitOf(best)).map((o) => unitPrice(o)) : [];
+    const officialMin = officials.length ? Math.min(...officials) : undefined;
     let mine: ReactNode = null;
     if (best && mySites && mySites.size) {
         const used = m.offers.find((o) => mySites.has(siteOf(o.url)));

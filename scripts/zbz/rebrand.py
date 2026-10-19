@@ -20,7 +20,7 @@ GLOBS = [
     ("agent-host", ("*.mjs",)),
     ("scripts/installers", ("windows.nsi",)),
 ]
-SKIP_PARTS = ("node_modules", "__tests__", "/testdata/", "/dist/", "cmd/update-release")
+SKIP_PARTS = ("node_modules", "__tests__", "/testdata/", "/dist/", "cmd/update-release", "web/src/zbz/", "internal/zbz")  # 自有模块已是章八爪品牌，且含对上游的署名，不替换
 
 def skip(p: pathlib.Path) -> bool:
     s = p.as_posix()

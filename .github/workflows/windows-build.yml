@@ -29,8 +29,17 @@ jobs:
         env:
           PYTHONUTF8: '1'
         run: |
+          python scripts/zbz/identity.py
+          python scripts/zbz/identity.py --check
           python scripts/zbz/rebrand.py
           python scripts/zbz/rebrand.py --check
+          python scripts/zbz/identity.py --check
+      - name: 质量闸门：前端类型检查
+        shell: bash
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run typecheck
       - name: Select bundled Node runtime
         shell: bash
         run: |
@@ -57,13 +66,21 @@ jobs:
           CGO_ENABLED: '1'
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-beeftv-windows-release.ps1
+      - name: 质量闸门：安装载荷身份巡检
+        shell: pwsh
+        run: |
+          $bin = 'backend\cmd\desktop\build\bin'
+          if (!(Test-Path "$bin\ZhangBaZhua.exe")) { Write-Error "缺少 ZhangBaZhua.exe"; exit 1 }
+          $bad = Get-ChildItem -LiteralPath $bin | Where-Object { $_.Name -match 'beeftv' }
+          if ($bad) { $bad | ForEach-Object { Write-Host "遗留：$($_.Name)" }; Write-Error "安装载荷顶层仍有 BeefTV 命名"; exit 1 }
+          Write-Host "载荷顶层：$((Get-ChildItem -LiteralPath $bin).Name -join ', ')"
       - name: Package native installer
         shell: bash
         run: python scripts/package-desktop-installer.py --platform windows-amd64
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: BeefTV-custom-windows
+          name: ZhangBaZhua-windows
           path: dist/ZhangBaZhua-*
           retention-days: 14
           if-no-files-found: warn

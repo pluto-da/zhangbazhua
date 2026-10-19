@@ -63,7 +63,7 @@ export default function RechargePage() {
         }
         setBalances((b) => {
             const next = { ...b };
-            for (const t of targets) next[t.id] = { provider: t.id, supported: true, balance: 0, currency: "", ...(b[t.id] || {}), loading: true };
+            for (const t of targets) next[t.id] = { ...(b[t.id] ?? { provider: t.id, supported: true, balance: 0, currency: "" }), loading: true };
             return next;
         });
         await Promise.all(targets.map(async (t) => {
