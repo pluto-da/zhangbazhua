@@ -4,7 +4,7 @@ on:
     branches: [beeftv-windows-build]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   windows:
     runs-on: windows-2022
@@ -60,3 +60,21 @@ jobs:
           path: dist/ZhangBaZhua-*
           retention-days: 14
           if-no-files-found: warn
+      - name: Release tag
+        id: rel
+        shell: bash
+        run: |
+          v=$(tr -d '[:space:]' < VERSION); v=${v#v}
+          echo "tag=zhangbazhua-v${v}-build${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "name=章八爪 v${v}（构建 ${{ github.run_number }}）" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            章八爪 Windows 安装包。下载下面的 ZhangBaZhua-*-windows-amd64-setup.exe，覆盖安装即可，数据不丢。
+            基于作者 BeefTV 最新代码 + 定制改动，提交 ${{ github.sha }}。
+          files: dist/ZhangBaZhua-*-setup.exe
+          make_latest: true
+          fail_on_unmatched_files: true
