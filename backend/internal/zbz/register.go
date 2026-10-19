@@ -20,6 +20,8 @@ func Register(api *gin.RouterGroup, dataDir string) {
 	g := api.Group("/zbz")
 	p := newPricing(dir)
 	g.GET("/prices", p.handle)
+	lv := newLive(dir, p)
+	g.GET("/live", lv.handle)
 	g.POST("/balance", handleBalance)
 	l := newLedger(dir)
 	g.GET("/ledger", l.list)

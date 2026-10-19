@@ -1,6 +1,6 @@
 // 章八爪模块 · 模块注册表与开关 · 作者 长鱼茶汤茗
 // 以后新增的自有功能都在这里登记一行，侧栏「章八爪」分组和模块中心会自动出现它。
-import { BadgeDollarSign, Boxes, Feather, Palette, Plug2, Wallet, type LucideIcon } from "lucide-react";
+import { BadgeDollarSign, Boxes, Feather, Palette, Plug2, Wallet, Zap, type LucideIcon } from "lucide-react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -23,6 +23,11 @@ export type ZbzModule = {
 };
 
 export const ZBZ_MODULES: ZbzModule[] = [
+    {
+        id: "live-prices", name: "实时最低价", kind: "工具", icon: Zap, route: "/zbz/live", version: "1.0.0", author: ZBZ_AUTHOR, defaultEnabled: true,
+        description: "盯住你关心的模型：此刻在哪里调用最便宜、比昨天涨还是降、分时价什么时候更便宜。打开即拉取，页面可见时每 5 分钟自动刷新。",
+        where: "web/src/zbz/pages/live-prices.tsx · backend/internal/zbz/live.go",
+    },
     {
         id: "price-radar", name: "模型比价雷达", kind: "工具", icon: BadgeDollarSign, route: "/zbz/prices", version: "1.0.0", author: ZBZ_AUTHOR, defaultEnabled: true,
         description: "每天汇总 models.dev、OpenRouter、LiteLLM 三大公开价格库，找出同一个模型最便宜的调用渠道，并和你正在用的渠道对比。",

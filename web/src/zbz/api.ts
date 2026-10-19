@@ -55,3 +55,44 @@ export function addLedger(entry: Omit<LedgerEntry, "id" | "at"> & { at?: string 
 export function deleteLedger(id: string) {
     return http.delete<{ deleted: string }>(`/zbz/ledger/${encodeURIComponent(id)}`);
 }
+
+export type LiveOffer = {
+    provider: string;
+    providerName: string;
+    tier: string;
+    source: string;
+    url: string;
+    china: boolean;
+    rawModel?: string;
+    inputUsd: number;
+    outputUsd: number;
+    baseInputUsd: number;
+    baseOutputUsd: number;
+    timed: boolean;
+    nextChangeAt?: string;
+    nextBlendUsd?: number;
+};
+
+export type LiveModel = {
+    id: string;
+    best: LiveOffer | null;
+    offers: LiveOffer[];
+    offerCount: number;
+    baseBestBlendUsd: number;
+    yesterdayBlendUsd: number | null;
+    changePct: number | null;
+    isNewLow: boolean;
+};
+
+export type LiveResponse = {
+    generatedAt: string;
+    mode: "live" | "daily" | "cache";
+    usdCny: number;
+    sources: Array<{ name: string; ok: boolean; fetchedAt?: string; error?: string }>;
+    models: LiveModel[];
+};
+
+export function fetchLive(models: string[], officialOnly: boolean) {
+    const q = new URLSearchParams({ models: models.join(","), official: officialOnly ? "1" : "0" });
+    return http.get<LiveResponse>(`/zbz/live?${q.toString()}`, { timeout: 90_000 });
+}

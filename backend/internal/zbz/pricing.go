@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -28,11 +29,11 @@ var priceSources = []string{
 const modelsDevURL = "https://models.dev/api.json"
 
 type pricing struct {
-	mu       sync.Mutex
-	cache    string
-	data     json.RawMessage
-	fetched  time.Time
-	source   string
+	mu      sync.Mutex
+	cache   string
+	data    json.RawMessage
+	fetched time.Time
+	source  string
 }
 
 func newPricing(dir string) *pricing {
@@ -136,8 +137,8 @@ func fromModelsDev(b []byte) (json.RawMessage, error) {
 		Doc    string `json:"doc"`
 		API    string `json:"api"`
 		Models map[string]struct {
-			Name   string `json:"name"`
-			Cost   *struct {
+			Name string `json:"name"`
+			Cost *struct {
 				Input     float64  `json:"input"`
 				Output    float64  `json:"output"`
 				CacheRead *float64 `json:"cache_read"`
@@ -180,11 +181,24 @@ func fromModelsDev(b []byte) (json.RawMessage, error) {
 
 func blend(o offer) float64 { return (3*o.Input + o.Output) / 4 }
 
+var (
+	reSuffix  = regexp.MustCompile(`:(free|beta|extended|thinking|nitro|floor)$`)
+	reDate    = regexp.MustCompile(`[-_@](20\d{2}-?\d{2}-?\d{2}|\d{4})$`)
+	reRegion  = regexp.MustCompile(`^(us|eu|apac|global)\.`)
+	reVendor  = regexp.MustCompile(`^(anthropic|meta|amazon|mistral|cohere|ai21)\.`)
+	reVersion = regexp.MustCompile(`-v\d+:\d+$`)
+)
+
+// canonical 与 scripts/zbz/price_radar.py 的 canonical 保持同一套规则。
 func canonical(id string) string {
-	s := strings.ToLower(id)
+	s := strings.ToLower(strings.TrimSpace(id))
 	if i := strings.LastIndex(s, "/"); i >= 0 {
 		s = s[i+1:]
 	}
-	s = strings.TrimSuffix(s, ":free")
+	s = reSuffix.ReplaceAllString(s, "")
+	s = reDate.ReplaceAllString(s, "")
+	s = reRegion.ReplaceAllString(s, "")
+	s = reVendor.ReplaceAllString(s, "")
+	s = reVersion.ReplaceAllString(s, "")
 	return s
 }
