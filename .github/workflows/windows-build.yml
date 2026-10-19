@@ -1,7 +1,7 @@
 name: Custom Windows build
 on:
   push:
-    branches: [beeftv-windows-build]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
