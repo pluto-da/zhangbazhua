@@ -78,7 +78,9 @@ jobs:
       - name: Test immutable publication and activation
         run: |
           node --test scripts/image-preparation-release-contract.test.mjs
+          node --test scripts/music3-release-contract.test.mjs
           python3 -m unittest discover -s scripts -p 'test_publish_desktop_r2.py'
+          python3 -m unittest discover -s scripts -p 'test_desktop_cos_store.py'
           python3 -m unittest discover -s scripts -p 'test_smoke_desktop_installer.py'
 
   backend:
@@ -116,6 +118,9 @@ jobs:
         run: sh ../plugin-packages/build-packages.sh
       - name: Run Go tests
         run: go test ./...
+      - name: Verify real production timing report
+        working-directory: agent-host/eval
+        run: python3 -m unittest report_production_test.py
 
   web:
     name: Web checks
